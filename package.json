@@ -1,0 +1,19 @@
+{
+  "name": "openclaw-memos-lifecycle-plugin",
+  "version": "1.0.0",
+  "description": "MemOS lifecycle plugin for OpenClaw - pre-fetches context and auto-saves tool traces",
+  "main": "index.js",
+  "type": "module",
+  "author": "anatolykoptev",
+  "license": "MIT",
+  "keywords": [
+    "openclaw",
+    "memos",
+    "memory",
+    "lifecycle",
+    "plugin"
+  ],
+  "openclaw": {
+    "extensions": ["./index.js"]
+  }
+}
