@@ -1,6 +1,8 @@
 # openclaw-memos-lifecycle-plugin
 
-OpenClaw lifecycle plugin for MemOS - pre-fetches context and auto-saves tool traces.
+OpenClaw lifecycle plugin for [MemOS](https://github.com/MemTensor/MemOS) - pre-fetches context and auto-saves tool traces.
+
+> **Powered by MemOS:** A production-grade memory system for LLM agents with semantic search, structured knowledge graphs, and vector embeddings.
 
 ## Features
 
