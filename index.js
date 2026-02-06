@@ -1,169 +1,97 @@
 /**
- * MemOS Lifecycle Plugin
- * 
- * Pre-loads memory context before agent starts, saves session summaries after.
- * Uses typed lifecycle hooks: before_agent_start, agent_end
+ * MemOS Lifecycle Plugin v2.1
+ *
+ * Production-grade memory bridge between OpenClaw and MemOS.
+ *
+ * Hook pipeline:
+ *   before_agent_start  → smart retrieval → inject relevant memories
+ *   agent_end           → extract durable facts (throttled)
+ *   before_compaction   → segment conversation → summarize → persist
+ *   after_compaction    → mark post-compaction state
+ *   tool_result_persist → capture tool execution traces
+ *
+ * Architecture:
+ *   index.js            — thin orchestrator (this file)
+ *   hooks/*             — one handler per lifecycle event
+ *   lib/client.js       — HTTP transport, auth, config
+ *   lib/health.js       — cached liveness probe
+ *   lib/search.js       — semantic search + formatting
+ *   lib/memory.js       — write-path (fire-and-forget + awaitable)
+ *   lib/summarize.js    — conversation summarization + fact extraction
+ *   lib/retrieval.js    — smart retrieval pipeline (pre-decision, rewriting, filtering, segmentation)
+ *
+ * Every hook is non-fatal: MemOS outages never crash the host agent.
  */
-import { searchMemories, formatContextBlock, addMemory, extractFacts } from "./lib/memos-api.js";
+import { LOG_PREFIX, applyConfig } from "./lib/client.js";
+import { createContextInjectionHandler } from "./hooks/context-injection.js";
+import { createFactExtractionHandler } from "./hooks/fact-extraction.js";
+import {
+  createBeforeCompactionHandler,
+  createAfterCompactionHandler,
+} from "./hooks/compaction-flush.js";
+import { handleToolTrace } from "./hooks/tool-trace.js";
 
-// Throttle state for autoCapture
-let lastAutoCaptureTime = 0;
-const AUTO_CAPTURE_THROTTLE_MS = 10 * 60 * 1000; // 10 minutes
+// ─── Shared State ───────────────────────────────────────────────────
+const POST_COMPACTION_WINDOW_MS = 2 * 60 * 1000;
 
+const state = {
+  lastCompactionTime: 0,
+  compactionCount: 0,
+  isPostCompaction() {
+    return (
+      this.lastCompactionTime > 0 &&
+      Date.now() - this.lastCompactionTime < POST_COMPACTION_WINDOW_MS
+    );
+  },
+};
+
+// ─── Plugin ─────────────────────────────────────────────────────────
 export default {
   id: "openclaw-memos-lifecycle-plugin",
   name: "MemOS Lifecycle",
-  description: "Pre-loads memory context, auto-saves session info",
-  kind: "lifecycle",
+  description:
+    "Memory bridge: context injection, compaction flush, fact extraction, tool traces",
+  configSchema: {
+    type: "object",
+    properties: {
+      memosApiUrl: { type: "string", default: "http://127.0.0.1:8000" },
+      memosUserId: { type: "string", default: "default" },
+      internalServiceSecret: { type: "string" },
+      contextInjection: { type: "boolean", default: true },
+      factExtraction: { type: "boolean", default: true },
+      compactionFlush: { type: "boolean", default: true },
+      toolTraces: { type: "boolean", default: true },
+    },
+    additionalProperties: false,
+  },
 
   register(api) {
-    console.log("[MEMOS] Registering lifecycle plugin...");
-    console.log("[MEMOS] api.on available:", typeof api.on);
+    const config = api.pluginConfig || {};
+    applyConfig(config);
 
-    // ═══════════════════════════════════════════════════════════════════════
-    // BEFORE AGENT START: Inject memory context into the conversation
-    // ═══════════════════════════════════════════════════════════════════════
-    console.log("[MEMOS] Registering before_agent_start hook...");
-    api.on("before_agent_start", async (event) => {
-      console.log("[MEMOS] before_agent_start FIRED! prompt length:", event?.prompt?.length || 0);
-      
-      // Skip if no prompt
-      if (!event.prompt || event.prompt.length < 5) {
-        return;
-      }
+    let hookCount = 0;
+    console.log(LOG_PREFIX, "Registering lifecycle plugin v2.1...");
 
-      try {
-        console.log("[MEMOS] Loading memory context...");
-
-        // Search for relevant memories based on user's prompt
-        const memories = await searchMemories(
-          "important user context preferences decisions " + event.prompt.slice(0, 200),
-          5
-        );
-
-        if (memories.length === 0) {
-          console.log("[MEMOS] No relevant memories found");
-          return;
-        }
-
-        const contextBlock = formatContextBlock(memories);
-        if (!contextBlock) {
-          return;
-        }
-
-        console.log("[MEMOS] Injecting", memories.length, "memories into context");
-
-        // Return prepended context that will be added to the conversation
-        return {
-          prependContext: `<user_memory_context>\nRelevant memories from MemOS:\n${contextBlock}\n</user_memory_context>`,
-        };
-
-      } catch (err) {
-        console.warn("[MEMOS] Context load failed:", err.message);
-        // Non-fatal, continue without memory context
-      }
-    });
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // AGENT END: Smart extraction of important facts from conversation
-    // Throttled to run max once per 10 minutes to avoid excessive LLM calls
-    // ═══════════════════════════════════════════════════════════════════════
-    api.on("agent_end", async (event) => {
-      if (!event.success || !event.messages || event.messages.length === 0) {
-        return;
-      }
-
-      // Throttle check
-      const now = Date.now();
-      if (now - lastAutoCaptureTime < AUTO_CAPTURE_THROTTLE_MS) {
-        console.log("[MEMOS] autoCapture throttled, skipping");
-        return;
-      }
-      lastAutoCaptureTime = now;
-
-      try {
-        // Extract text content from messages
-        const conversationParts = [];
-
-        for (const msg of event.messages) {
-          if (!msg || typeof msg !== "object") continue;
-          
-          const role = msg.role;
-          if (role !== "user" && role !== "assistant") continue;
-
-          const content = typeof msg.content === "string" 
-            ? msg.content 
-            : Array.isArray(msg.content)
-              ? msg.content
-                  .filter(b => b?.type === "text")
-                  .map(b => b.text)
-                  .join(" ")
-              : "";
-
-          if (content) {
-            conversationParts.push(`${role}: ${content.slice(0, 1000)}`);
-          }
-        }
-
-        if (conversationParts.length < 2) {
-          return; // Need at least one exchange
-        }
-
-        const conversationText = conversationParts.join("\n\n");
-
-        // Use LLM to extract important facts
-        console.log("[MEMOS] Extracting facts from conversation...");
-        const facts = await extractFacts(conversationText);
-
-        if (facts && facts.length > 0) {
-          console.log("[MEMOS] Found", facts.length, "important facts to save");
-          
-          for (const fact of facts) {
-            if (typeof fact === "string" && fact.length > 10) {
-              addMemory(fact, ["auto_capture", "fact"]);
-            }
-          }
-        } else {
-          console.log("[MEMOS] No important facts to extract");
-        }
-
-      } catch (err) {
-        console.log("[MEMOS] Fact extraction failed:", err.message);
-        // Non-fatal
-      }
-    });
-
-    // ═══════════════════════════════════════════════════════════════════════
-    // TOOL RESULT PERSIST: Save tool execution traces
-    // ═══════════════════════════════════════════════════════════════════════
-    api.registerHook(["tool_result_persist"], (event, ctx) => {
-      const toolName = event?.toolName || ctx?.toolName;
-      
-      // Skip memory-related tools to avoid recursion
-      if (!toolName || 
-          toolName.startsWith("memos") || 
-          toolName.startsWith("memory") ||
-          toolName.startsWith("search_memories")) {
-        return;
-      }
-
-      const truncate = (obj, maxLen) => {
-        if (!obj) return "";
-        const str = typeof obj === "string" ? obj : JSON.stringify(obj);
-        return str.length > maxLen ? str.slice(0, maxLen) + "..." : str;
-      };
-
-      const traceContent = JSON.stringify({
-        type: "tool_trace",
-        tool: toolName,
-        result: truncate(event?.message, 300),
-        ts: new Date().toISOString(),
+    if (config.contextInjection !== false) {
+      api.on("before_agent_start", createContextInjectionHandler(state));
+      hookCount++;
+    }
+    if (config.factExtraction !== false) {
+      api.on("agent_end", createFactExtractionHandler(state));
+      hookCount++;
+    }
+    if (config.compactionFlush !== false) {
+      api.on("before_compaction", createBeforeCompactionHandler(state));
+      api.on("after_compaction", createAfterCompactionHandler(state));
+      hookCount += 2;
+    }
+    if (config.toolTraces !== false) {
+      api.registerHook(["tool_result_persist"], handleToolTrace, {
+        name: "memos-tool-trace",
       });
+      hookCount++;
+    }
 
-      // Fire-and-forget
-      addMemory(traceContent, ["tool_trace", toolName]);
-    }, { name: "memos-tool-trace" });
-
-    console.log("[MEMOS] Lifecycle plugin registered");
+    console.log(LOG_PREFIX, `Lifecycle plugin v2.1 registered (${hookCount} hooks active)`);
   },
 };

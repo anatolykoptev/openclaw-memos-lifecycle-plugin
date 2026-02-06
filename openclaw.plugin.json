@@ -1,13 +1,81 @@
 {
   "id": "openclaw-memos-lifecycle-plugin",
   "name": "MemOS Lifecycle",
-  "description": "Pre-loads memory context, auto-saves tool traces",
-  "version": "1.0.0",
-  "kind": "lifecycle",
-  "main": "./index.js",
+  "description": "Memory bridge between OpenClaw and MemOS — smart context injection, compaction flush, fact extraction, tool traces",
+  "version": "2.1.0",
   "configSchema": {
     "type": "object",
-    "properties": {},
+    "properties": {
+      "memosApiUrl": {
+        "type": "string",
+        "description": "MemOS REST API base URL",
+        "default": "http://127.0.0.1:8000"
+      },
+      "memosUserId": {
+        "type": "string",
+        "description": "MemOS user ID for memory scoping",
+        "default": "default"
+      },
+      "internalServiceSecret": {
+        "type": "string",
+        "description": "Optional X-Internal-Service header for authenticated MemOS access"
+      },
+      "contextInjection": {
+        "type": "boolean",
+        "description": "Enable memory context injection on before_agent_start",
+        "default": true
+      },
+      "factExtraction": {
+        "type": "boolean",
+        "description": "Enable automatic fact extraction on agent_end",
+        "default": true
+      },
+      "compactionFlush": {
+        "type": "boolean",
+        "description": "Enable conversation summarization on before_compaction",
+        "default": true
+      },
+      "toolTraces": {
+        "type": "boolean",
+        "description": "Enable tool execution trace persistence",
+        "default": true
+      }
+    },
     "additionalProperties": false
+  },
+  "uiHints": {
+    "memosApiUrl": {
+      "label": "MemOS API URL",
+      "placeholder": "http://127.0.0.1:8000",
+      "help": "Base URL for the MemOS REST API (or use ${MEMOS_API_URL})",
+      "advanced": true
+    },
+    "memosUserId": {
+      "label": "MemOS User ID",
+      "placeholder": "default",
+      "help": "User ID for memory scoping in MemOS (or use ${MEMOS_USER_ID})",
+      "advanced": true
+    },
+    "internalServiceSecret": {
+      "label": "Internal Service Secret",
+      "sensitive": true,
+      "help": "Optional X-Internal-Service auth header (or use ${INTERNAL_SERVICE_SECRET})"
+    },
+    "contextInjection": {
+      "label": "Context Injection",
+      "help": "Inject relevant memories into context before each agent turn"
+    },
+    "factExtraction": {
+      "label": "Fact Extraction",
+      "help": "Extract durable facts from conversations after each agent turn"
+    },
+    "compactionFlush": {
+      "label": "Compaction Flush",
+      "help": "Summarize and persist conversation before context compaction"
+    },
+    "toolTraces": {
+      "label": "Tool Traces",
+      "help": "Save tool execution results to MemOS for future reference"
+    }
   }
 }

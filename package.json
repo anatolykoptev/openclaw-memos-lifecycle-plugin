@@ -1,17 +1,33 @@
 {
   "name": "openclaw-memos-lifecycle-plugin",
-  "version": "1.0.0",
-  "description": "MemOS lifecycle plugin for OpenClaw - pre-fetches context and auto-saves tool traces",
+  "version": "2.1.0",
+  "description": "Memory bridge between OpenClaw and MemOS — smart context injection, compaction flush, fact extraction, tool traces",
   "main": "index.js",
   "type": "module",
   "author": "anatolykoptev",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/anatolykoptev/openclaw-memos-lifecycle-plugin"
+  },
+  "homepage": "https://github.com/anatolykoptev/openclaw-memos-lifecycle-plugin#readme",
+  "engines": {
+    "node": ">=22"
+  },
+  "peerDependencies": {
+    "openclaw": ">=2026.1.29"
+  },
   "keywords": [
     "openclaw",
+    "openclaw-plugin",
     "memos",
+    "memos-lifecycle",
     "memory",
-    "lifecycle",
-    "plugin"
+    "context-injection",
+    "compaction",
+    "fact-extraction",
+    "tool-traces",
+    "lifecycle"
   ],
   "openclaw": {
     "extensions": ["./index.js"]
