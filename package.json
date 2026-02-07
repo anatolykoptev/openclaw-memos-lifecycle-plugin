@@ -1,7 +1,7 @@
 {
   "name": "openclaw-memos-lifecycle-plugin",
-  "version": "2.1.0",
-  "description": "Memory bridge between OpenClaw and MemOS — smart context injection, compaction flush, fact extraction, tool traces",
+  "version": "3.0.0",
+  "description": "Memory bridge between OpenClaw and MemOS — typed memory extraction, task lifecycle, context injection, compaction flush, skill learning, todo auto-remind",
   "main": "index.js",
   "type": "module",
   "author": "anatolykoptev",
@@ -25,11 +25,16 @@
     "memory",
     "context-injection",
     "compaction",
+    "typed-memory",
+    "skill-learning",
     "fact-extraction",
     "tool-traces",
+    "task-manager",
     "lifecycle"
   ],
   "openclaw": {
-    "extensions": ["./index.js"]
+    "extensions": [
+      "./index.js"
+    ]
   }
 }

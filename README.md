@@ -2,20 +2,34 @@
 
 Memory bridge between [OpenClaw](https://openclaw.com) and [MemOS](https://github.com/MemTensor/MemOS). Your agent never loses important context — memories persist across conversation compactions and sessions.
 
+## What's New in v2.2
+
+**Typed Memory Extraction** — inspired by [memU](https://github.com/NevaMind-AI/memU), memories are now categorized into distinct types:
+
+| Type | What it captures | Tags |
+|------|------------------|------|
+| **Profile** | Stable user facts (age, job, location, preferences) | `user_profile`, `stable_fact` |
+| **Behavior** | Recurring patterns, habits, routines | `behavior_pattern`, `habit` |
+| **Skill** | Agent skills with documentation (how to do things) | `agent_skill`, `workflow` |
+| **Event** | Time-bound events and decisions | `event`, `decision` |
+
+**Skill Learning from Tools** — when complex tool operations succeed, the agent automatically documents them as reusable skills.
+
 ## Why?
 
 MemOS stores and retrieves memories. OpenClaw runs agents. But MemOS doesn't know **when** to save or **what** to retrieve. This plugin bridges that gap:
 
 - **When to save** — after every conversation (`agent_end`), before compaction (`before_compaction`), after tool calls (`tool_result_persist`)
 - **When to retrieve** — before every agent turn (`before_agent_start`), with smart filtering to skip casual messages
-- **What to extract** — structured facts, compaction summaries, tool execution traces
+- **What to extract** — typed memories (profile/behavior/skill/event), compaction summaries, tool execution traces, learned skills
 
 ## Features
 
+- **Typed memory extraction** — memories categorized by type for better organization and retrieval (v2.2)
+- **Skill learning** — complex tool operations documented as reusable skills (v2.2)
 - **Smart context injection** — pre-retrieval decision skips greetings/casual prompts, query rewriting enriches search with entities and intent, sufficiency filtering removes duplicates
 - **Compaction flush** — long conversations segmented into topic-coherent chunks, each summarized separately for higher quality memory extraction
 - **Post-compaction recovery** — enriched context automatically restored after compaction (summaries + relevant memories)
-- **Fact extraction** — durable facts extracted from conversations (throttled, skipped post-compaction)
 - **Tool traces** — tool execution results saved for future reference (memory-related tools skipped to avoid recursion)
 - **Non-fatal** — MemOS outages never crash the host agent
 - **Configurable** — every hook can be individually toggled, all settings overridable via `openclaw.plugin.json`

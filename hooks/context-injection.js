@@ -1,5 +1,5 @@
 /**
- * Hook: before_agent_start — Context Injection
+ * Hook: before_agent_start — Context Injection + Todo Auto-Remind
  *
  * Smart retrieval pipeline (inspired by memU):
  * 1. Pre-retrieval decision — skip casual/greeting prompts
@@ -7,8 +7,11 @@
  * 3. Semantic search via MemOS
  * 4. Sufficiency filtering — dedupe, drop low-value results
  * 5. Format and inject
+ * 6. Todo Auto-Remind — proactively show pending tasks
  *
  * After compaction: enriched mode (summaries + relevant, more items).
+ *
+ * v3.0: Uses task-manager for todo auto-remind, proper filter param for search.
  *
  * @module hooks/context-injection
  */
@@ -20,6 +23,11 @@ import {
   rewriteQuery,
   filterBySufficiency,
 } from "../lib/retrieval.js";
+import { findTasks, formatTaskList } from "../lib/task-manager.js";
+
+// ─── Todo Auto-Remind Config ────────────────────────────────────────
+const TODO_REMIND_COOLDOWN_MS = 30 * 60 * 1000; // 30 min between reminds
+let lastTodoRemindTime = 0;
 
 /**
  * @param {object} state - Shared plugin state
@@ -55,7 +63,7 @@ export function createContextInjectionHandler(state) {
           searchMemories(
             "compaction summary decisions progress pending tasks",
             6,
-            ["compaction_summary"],
+            { filter: { _type: "compaction_summary" } },
           ).catch(() => []),
           searchMemories(enrichedQuery, 6).catch(() => []),
         ]);
@@ -97,15 +105,31 @@ export function createContextInjectionHandler(state) {
           : "Relevant memories from MemOS:",
       });
 
-      if (!contextBlock) return;
+      // ── Step 6: Todo Auto-Remind (proactive) ──
+      let todoReminder = "";
+      const now = Date.now();
+      if (now - lastTodoRemindTime > TODO_REMIND_COOLDOWN_MS) {
+        const pendingTasks = await findTasks({ status: "pending" });
+        if (pendingTasks.length > 0) {
+          todoReminder = formatTaskList(pendingTasks);
+          lastTodoRemindTime = now;
+          console.log(LOG_PREFIX, `Todo Auto-Remind: ${pendingTasks.length} pending tasks`);
+        }
+      }
+
+      if (!contextBlock && !todoReminder) return;
+
+      const parts = [];
+      if (contextBlock) parts.push(contextBlock);
+      if (todoReminder) parts.push(todoReminder);
 
       console.log(
         LOG_PREFIX,
-        `Injecting ${memories.length} memories (${postCompaction ? "post-compaction" : "normal"}, decision=${decision})`,
+        `Injecting ${memories.length} memories (${postCompaction ? "post-compaction" : "normal"}, decision=${decision})${todoReminder ? " + todo reminder" : ""}`,
       );
 
       return {
-        prependContext: `<user_memory_context>\n${contextBlock}\n</user_memory_context>`,
+        prependContext: `<user_memory_context>\n${parts.join("\n\n")}\n</user_memory_context>`,
       };
     } catch (err) {
       console.warn(LOG_PREFIX, "Context injection failed:", err.message);

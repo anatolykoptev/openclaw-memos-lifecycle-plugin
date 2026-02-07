@@ -1,24 +1,33 @@
 /**
- * MemOS Lifecycle Plugin v2.1
+ * MemOS Lifecycle Plugin v3.0
  *
  * Production-grade memory bridge between OpenClaw and MemOS.
+ * Typed memory extraction, task lifecycle, todo auto-remind.
  *
  * Hook pipeline:
- *   before_agent_start  → smart retrieval → inject relevant memories
- *   agent_end           → extract durable facts (throttled)
+ *   before_agent_start  → smart retrieval → inject memories + todo auto-remind
+ *   agent_end           → extract typed memories (profile/behavior/skill/event/task)
  *   before_compaction   → segment conversation → summarize → persist
  *   after_compaction    → mark post-compaction state
- *   tool_result_persist → capture tool execution traces
+ *   tool_result_persist → capture tool traces + extract skills from complex operations
+ *
+ * Tools:
+ *   memos_create_task   → create a task with priority/deadline
+ *   memos_complete_task → mark a task as completed
+ *   memos_list_tasks    → list tasks by status/priority
  *
  * Architecture:
- *   index.js            — thin orchestrator (this file)
- *   hooks/*             — one handler per lifecycle event
- *   lib/client.js       — HTTP transport, auth, config
- *   lib/health.js       — cached liveness probe
- *   lib/search.js       — semantic search + formatting
- *   lib/memory.js       — write-path (fire-and-forget + awaitable)
- *   lib/summarize.js    — conversation summarization + fact extraction
- *   lib/retrieval.js    — smart retrieval pipeline (pre-decision, rewriting, filtering, segmentation)
+ *   index.js              — thin orchestrator (this file)
+ *   hooks/*               — one handler per lifecycle event
+ *   lib/client.js         — HTTP transport, auth, config, dedup cache
+ *   lib/health.js         — cached liveness probe
+ *   lib/search.js         — semantic search + formatting
+ *   lib/memory.js         — write-path (fire-and-forget + awaitable)
+ *   lib/task-manager.js   — task CRUD with append-only reconciliation
+ *   lib/summarize.js      — conversation summarization + fact extraction
+ *   lib/retrieval.js      — smart retrieval pipeline
+ *   lib/memory-types.js   — memory type definitions and prompts
+ *   lib/typed-extraction.js — typed memory extraction logic
  *
  * Every hook is non-fatal: MemOS outages never crash the host agent.
  */
@@ -30,6 +39,7 @@ import {
   createAfterCompactionHandler,
 } from "./hooks/compaction-flush.js";
 import { handleToolTrace } from "./hooks/tool-trace.js";
+import { createTask, completeTask, findTasks } from "./lib/task-manager.js";
 
 // ─── Shared State ───────────────────────────────────────────────────
 const POST_COMPACTION_WINDOW_MS = 2 * 60 * 1000;
@@ -50,7 +60,7 @@ export default {
   id: "openclaw-memos-lifecycle-plugin",
   name: "MemOS Lifecycle",
   description:
-    "Memory bridge: context injection, compaction flush, fact extraction, tool traces",
+    "Memory bridge: context injection, compaction flush, fact extraction, tool traces, task management",
   configSchema: {
     type: "object",
     properties: {
@@ -61,6 +71,7 @@ export default {
       factExtraction: { type: "boolean", default: true },
       compactionFlush: { type: "boolean", default: true },
       toolTraces: { type: "boolean", default: true },
+      taskManager: { type: "boolean", default: true },
     },
     additionalProperties: false,
   },
@@ -70,7 +81,7 @@ export default {
     applyConfig(config);
 
     let hookCount = 0;
-    console.log(LOG_PREFIX, "Registering lifecycle plugin v2.1...");
+    console.log(LOG_PREFIX, "Registering lifecycle plugin v3.0 (task manager + info field)...");
 
     if (config.contextInjection !== false) {
       api.on("before_agent_start", createContextInjectionHandler(state));
@@ -92,6 +103,54 @@ export default {
       hookCount++;
     }
 
-    console.log(LOG_PREFIX, `Lifecycle plugin v2.1 registered (${hookCount} hooks active)`);
+    // ─── Task Management Tools ──────────────────────────────────────
+    if (config.taskManager !== false) {
+      api.registerTool({
+        name: "memos_create_task",
+        description: "Create a new task/todo with priority and optional deadline",
+        parameters: {
+          type: "object",
+          properties: {
+            name: { type: "string", description: "Task name/description" },
+            priority: { type: "string", enum: ["P0", "P1", "P2"], default: "P2", description: "Priority: P0=urgent, P1=important, P2=normal" },
+            deadline: { type: "string", description: "Optional deadline (e.g. '2026-02-10', 'end of week')" },
+            context: { type: "string", description: "Optional additional context" },
+          },
+          required: ["name"],
+        },
+        execute: async (params) => createTask(params.name, params),
+      });
+
+      api.registerTool({
+        name: "memos_complete_task",
+        description: "Mark a task as completed with optional outcome notes",
+        parameters: {
+          type: "object",
+          properties: {
+            task_id: { type: "string", description: "Task ID (from memos_list_tasks or memos_create_task)" },
+            outcome: { type: "string", description: "Optional outcome/notes about completion" },
+          },
+          required: ["task_id"],
+        },
+        execute: async (params) => completeTask(params.task_id, params.outcome),
+      });
+
+      api.registerTool({
+        name: "memos_list_tasks",
+        description: "List tasks filtered by status and/or priority",
+        parameters: {
+          type: "object",
+          properties: {
+            status: { type: "string", enum: ["pending", "done"], description: "Filter by status (default: all)" },
+            priority: { type: "string", enum: ["P0", "P1", "P2"], description: "Filter by priority" },
+          },
+        },
+        execute: async (params) => findTasks(params),
+      });
+
+      console.log(LOG_PREFIX, "Task management tools registered (create/complete/list)");
+    }
+
+    console.log(LOG_PREFIX, `Lifecycle plugin v3.0 registered (${hookCount} hooks active)`);
   },
 };

@@ -1,8 +1,8 @@
 {
   "id": "openclaw-memos-lifecycle-plugin",
   "name": "MemOS Lifecycle",
-  "description": "Memory bridge between OpenClaw and MemOS — smart context injection, compaction flush, fact extraction, tool traces",
-  "version": "2.1.1",
+  "description": "Memory bridge between OpenClaw and MemOS — smart context injection, compaction flush, fact extraction, tool traces, task management",
+  "version": "3.0.0",
   "configSchema": {
     "type": "object",
     "properties": {
@@ -43,6 +43,11 @@
       "toolTraces": {
         "type": "boolean",
         "description": "Enable tool execution trace persistence",
+        "default": true
+      },
+      "taskManager": {
+        "type": "boolean",
+        "description": "Enable task management tools (create/complete/list)",
         "default": true
       }
     },
@@ -87,6 +92,10 @@
     "toolTraces": {
       "label": "Tool Traces",
       "help": "Save tool execution results to MemOS for future reference"
+    },
+    "taskManager": {
+      "label": "Task Manager",
+      "help": "Enable task management tools for creating, completing, and listing tasks"
     }
   }
 }

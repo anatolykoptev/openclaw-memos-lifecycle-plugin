@@ -6,12 +6,14 @@
  * after_compaction:  Marks a timestamp so the next before_agent_start
  *   switches to enriched context mode.
  *
+ * v3.0: Uses info field for structured metadata on compaction events.
+ *
  * @module hooks/compaction-flush
  */
 import { isHealthy } from "../lib/health.js";
 import { addMemory, addMemoryAwait } from "../lib/memory.js";
 import { summarizeConversation, flattenMessages } from "../lib/summarize.js";
-import { LOG_PREFIX } from "../lib/client.js";
+import { LOG_PREFIX, isDuplicateMemory, markMemoryAdded } from "../lib/client.js";
 import { segmentConversation } from "../lib/retrieval.js";
 
 /**
@@ -85,10 +87,16 @@ export function createBeforeCompactionHandler(state) {
 
       let saved = 0;
       let failed = 0;
+      let skipped = 0;
       await Promise.allSettled(
         allEntries.map(async (entry) => {
           try {
+            if (isDuplicateMemory(entry.content)) {
+              skipped++;
+              return;
+            }
             await addMemoryAwait(entry.content, entry.tags);
+            markMemoryAdded(entry.content);
             saved++;
           } catch (err) {
             failed++;
@@ -99,21 +107,23 @@ export function createBeforeCompactionHandler(state) {
 
       state.compactionCount++;
       addMemory(
-        JSON.stringify({
-          type: "compaction_event",
-          compactionNumber: state.compactionCount,
-          messageCount: messages.length,
-          tokenEstimate,
-          entriesSaved: saved,
-          entriesFailed: failed,
+        `Compaction #${state.compactionCount}: ${saved} entries saved from ${messages.length} messages`,
+        ["compaction_summary"],
+        {
+          _type: "compaction_summary",
+          compaction_number: state.compactionCount,
+          entries_saved: saved,
+          entries_failed: failed,
+          entries_skipped: skipped,
+          message_count: messages.length,
+          token_estimate: tokenEstimate,
           ts: new Date().toISOString(),
-        }),
-        ["compaction_event", "system"],
+        },
       );
 
       console.log(
         LOG_PREFIX,
-        `Compaction flush: ${saved} saved, ${failed} failed (#${state.compactionCount})`,
+        `Compaction flush: ${saved} saved, ${skipped} skipped, ${failed} failed (#${state.compactionCount})`,
       );
     } catch (err) {
       console.error(LOG_PREFIX, "Compaction flush failed:", err.message);
