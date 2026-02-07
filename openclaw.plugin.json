@@ -2,7 +2,7 @@
   "id": "openclaw-memos-lifecycle-plugin",
   "name": "MemOS Lifecycle",
   "description": "Memory bridge between OpenClaw and MemOS — smart context injection, compaction flush, fact extraction, tool traces",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "configSchema": {
     "type": "object",
     "properties": {
@@ -14,6 +14,11 @@
       "memosUserId": {
         "type": "string",
         "description": "MemOS user ID for memory scoping",
+        "default": "default"
+      },
+      "memosCubeId": {
+        "type": "string",
+        "description": "MemOS cube ID for memory scoping (required for v2.0+)",
         "default": "default"
       },
       "internalServiceSecret": {
@@ -54,6 +59,12 @@
       "label": "MemOS User ID",
       "placeholder": "default",
       "help": "User ID for memory scoping in MemOS (or use ${MEMOS_USER_ID})",
+      "advanced": true
+    },
+    "memosCubeId": {
+      "label": "MemOS Cube ID",
+      "placeholder": "default",
+      "help": "Cube ID for memory scoping in MemOS v2.0+ (or use ${MEMOS_CUBE_ID})",
       "advanced": true
     },
     "internalServiceSecret": {
