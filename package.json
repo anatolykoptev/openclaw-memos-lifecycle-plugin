@@ -5,7 +5,7 @@
   "main": "index.js",
   "type": "module",
   "author": "anatolykoptev",
-  "license": "Apache-2.0",
+  "license": "FSL-1.1-Apache-2.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/anatolykoptev/openclaw-memos-lifecycle-plugin"
