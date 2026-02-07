@@ -15,6 +15,11 @@ import { flattenMessages } from "../lib/summarize.js";
 import { extractAllTypedMemories } from "../lib/typed-extraction.js";
 import { LOG_PREFIX, isDuplicateMemory, markMemoryAdded } from "../lib/client.js";
 
+/** Generate a unique task ID */
+function genTaskId() {
+  return `task_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
 const THROTTLE_MS = 5 * 60 * 1000; // 5 min
 
 /**
@@ -52,16 +57,31 @@ export function createFactExtractionHandler(state) {
         let saved = 0, skipped = 0;
         for (const mem of memories) {
           const memType = mem.type || "fact";
-          if (isDuplicateMemory(mem.content, memType)) {
+          // For tasks, use title from structured extraction; fallback to content
+          const contentText = (memType === "task" && mem.title)
+            ? `TASK: ${mem.title}`
+            : mem.content;
+
+          if (isDuplicateMemory(contentText, memType)) {
             skipped++;
             continue;
           }
 
           const info = { _type: memType, source: "typed_extraction" };
-          if (memType === "task") info.task_status = "pending";
 
-          addMemory(mem.content, mem.tags, info);
-          markMemoryAdded(mem.content, memType);
+          // Populate TickTick-aligned fields for auto-extracted tasks
+          if (memType === "task") {
+            info.task_id = genTaskId();
+            info.task_status = "pending";
+            info.title = mem.title || mem.content;
+            if (mem.priority) info.priority = mem.priority;
+            if (mem.due_date) info.due_date = mem.due_date;
+            if (mem.project) info.project = mem.project;
+            if (mem.desc) info.desc = mem.desc;
+          }
+
+          addMemory(contentText, mem.tags, info);
+          markMemoryAdded(contentText, memType);
           saved++;
         }
         if (saved > 0 || skipped > 0) {
