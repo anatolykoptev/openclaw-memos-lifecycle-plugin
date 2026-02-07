@@ -58,7 +58,7 @@ export function createFactExtractionHandler(state) {
           }
 
           const info = { _type: memType, source: "typed_extraction" };
-          if (memType === "task") info.status = "pending";
+          if (memType === "task") info.task_status = "pending";
 
           addMemory(mem.content, mem.tags, info);
           markMemoryAdded(mem.content, memType);
