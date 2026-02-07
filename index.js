@@ -107,18 +107,22 @@ export default {
     if (config.taskManager !== false) {
       api.registerTool({
         name: "memos_create_task",
-        description: "Create a new task/todo with priority and optional deadline",
+        description: "Create a new task/todo with priority, deadline, project. Fields aligned with TickTick API.",
         parameters: {
           type: "object",
           properties: {
-            name: { type: "string", description: "Task name/description" },
+            title: { type: "string", description: "Task title" },
+            desc: { type: "string", description: "Detailed description / notes" },
             priority: { type: "string", enum: ["P0", "P1", "P2"], default: "P2", description: "Priority: P0=urgent, P1=important, P2=normal" },
-            deadline: { type: "string", description: "Optional deadline (e.g. '2026-02-10', 'end of week')" },
-            context: { type: "string", description: "Optional additional context" },
+            due_date: { type: "string", description: "Due date (e.g. '2026-02-10', 'Friday')" },
+            start_date: { type: "string", description: "Start date (e.g. '2026-02-08')" },
+            project: { type: "string", description: "Project name (e.g. 'MemOSina', 'Piter.now')" },
+            items: { type: "array", items: { type: "string" }, description: "Subtask list" },
+            context: { type: "string", description: "Additional context" },
           },
-          required: ["name"],
+          required: ["title"],
         },
-        execute: async (params) => createTask(params.name, params),
+        execute: async (params) => createTask(params.title, params),
       });
 
       api.registerTool({
@@ -137,12 +141,13 @@ export default {
 
       api.registerTool({
         name: "memos_list_tasks",
-        description: "List tasks filtered by status and/or priority",
+        description: "List tasks filtered by status, priority, and/or project",
         parameters: {
           type: "object",
           properties: {
             status: { type: "string", enum: ["pending", "done"], description: "Filter by status (default: all)" },
             priority: { type: "string", enum: ["P0", "P1", "P2"], description: "Filter by priority" },
+            project: { type: "string", description: "Filter by project name" },
           },
         },
         execute: async (params) => findTasks(params),
