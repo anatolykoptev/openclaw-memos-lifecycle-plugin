@@ -2,6 +2,54 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.1.0] — 2026-02-07
+
+### Added
+- **`lib/utils.js`** — shared utilities consolidating 4 duplicated patterns:
+  - `parseJSON(text, context)` — robust JSON extraction from LLM output (was duplicated 3x)
+  - `getMemoryContent(mem)` — memory text accessor (was duplicated 2x)
+  - `getInfo(mem)` — info metadata accessor (was private in task-manager.js)
+  - `generateTaskId()` — unique task ID generator (was duplicated 2x)
+- **`Timeouts.EXTRACTION`** (20s) — dedicated timeout for single-type extraction, shorter than `SUMMARIZE` (60s)
+
+### Changed
+- All modules (`summarize.js`, `typed-extraction.js`, `search.js`, `memory.js`) use getter functions (`getMemosUserId()`, `getMemosCubeId()`) instead of mutable `let` exports
+- `extractFacts` and `extractTypedMemories` use `Timeouts.EXTRACTION` (20s) instead of `Timeouts.SUMMARIZE` (60s)
+- `extractSkillFromTool` uses `parseJSON()` instead of bare `JSON.parse()` (crash fix for malformed LLM output)
+
+### Fixed
+- **`hooks/tool-trace.js`** — `recentExecutions` Map now has cleanup logic (was unbounded, potential memory leak)
+
+### Removed
+- Back-compat mutable `let` exports from `client.js` (`MEMOS_API_URL`, `MEMOS_USER_ID`, `MEMOS_CUBE_ID`)
+- Refresh logic in `applyConfig()` (no longer needed without mutable exports)
+- `"search_memories"` from `tool-trace.js` `SKIP_PREFIXES` (no such tool exists)
+- Local `getInfo()` from `task-manager.js` (moved to shared `utils.js`)
+- Local `genTaskId()` from `fact-extraction.js` (moved to shared `utils.js`)
+
+## [3.0.0] — 2026-02-07
+
+### Added
+- **Task lifecycle manager** (`lib/task-manager.js`) — full CRUD with append-only reconciliation
+  - `createTask(title, opts)` — create tasks with TickTick-aligned fields
+  - `findTasks(opts)` — reconcile creation + update memories, filter by status/priority/project
+  - `completeTask(taskId, outcome)` — mark task completed with optional outcome
+  - `formatTaskList(tasks)` — format for context injection
+- **3 agent tools** registered in `index.js`: `memos_create_task`, `memos_complete_task`, `memos_list_tasks`
+- **`info` field** on all memory writes — structured metadata with auto `content_hash` (SHA256 dedup, memU pattern)
+- **Content hash deduplication** in `client.js` — `computeContentHash()`, `isDuplicateMemory()`, `markMemoryAdded()`
+- **Structured task extraction** in `fact-extraction.js` — auto-extracted tasks get `task_id` + TickTick fields in `info`
+- **Task type** added to `memory-types.js` extraction prompts
+
+### Changed
+- `searchMemories()` uses proper `filter` parameter instead of no-op `filter_tags`
+- `addMemoryAwait()` auto-injects `content_hash` into `info` for cross-session deduplication
+- Task fields aligned with TickTick API: `title`, `desc`, `due_date`, `start_date`, `project`, `items`
+- `status` renamed to `task_status` in info (MemOS reserves `metadata.status` internally)
+
+### Removed
+- `openclaw-task-router` plugin (replaced by integrated task tools)
+
 ## [2.1.0] — 2026-02-06
 
 ### Added

@@ -1,5 +1,5 @@
 /**
- * MemOS Lifecycle Plugin v3.0
+ * MemOS Lifecycle Plugin v3.1
  *
  * Production-grade memory bridge between OpenClaw and MemOS.
  * Typed memory extraction, task lifecycle, todo auto-remind.
@@ -81,7 +81,7 @@ export default {
     applyConfig(config);
 
     let hookCount = 0;
-    console.log(LOG_PREFIX, "Registering lifecycle plugin v3.0 (task manager + info field)...");
+    console.log(LOG_PREFIX, "Registering lifecycle plugin v3.1 (utils consolidation + getter migration)...");
 
     if (config.contextInjection !== false) {
       api.on("before_agent_start", createContextInjectionHandler(state));
@@ -156,6 +156,6 @@ export default {
       console.log(LOG_PREFIX, "Task management tools registered (create/complete/list)");
     }
 
-    console.log(LOG_PREFIX, `Lifecycle plugin v3.0 registered (${hookCount} hooks active)`);
+    console.log(LOG_PREFIX, `Lifecycle plugin v3.1 registered (${hookCount} hooks active)`);
   },
 };

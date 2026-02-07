@@ -12,7 +12,7 @@ import { addMemory } from "../lib/memory.js";
 import { extractSkillFromTool } from "../lib/typed-extraction.js";
 import { LOG_PREFIX } from "../lib/client.js";
 
-const SKIP_PREFIXES = ["memos", "memory", "search_memories"];
+const SKIP_PREFIXES = ["memos", "memory"];
 
 // Track tool executions for skill extraction
 const recentExecutions = new Map();
@@ -68,6 +68,13 @@ export async function handleToolTrace(event, ctx) {
           console.log(LOG_PREFIX, `Extracted skill from ${toolName}`);
           addMemory(skill.content, skill.tags);
           recentExecutions.set(toolName, now);
+          // Cleanup old entries
+          if (recentExecutions.size > 100) {
+            const cutoff = now - SKILL_EXTRACTION_COOLDOWN_MS;
+            for (const [key, ts] of recentExecutions) {
+              if (ts < cutoff) recentExecutions.delete(key);
+            }
+          }
         }
       } catch (err) {
         // Silent fail — skill extraction is optional

@@ -14,11 +14,7 @@ import { addMemory } from "../lib/memory.js";
 import { flattenMessages } from "../lib/summarize.js";
 import { extractAllTypedMemories } from "../lib/typed-extraction.js";
 import { LOG_PREFIX, isDuplicateMemory, markMemoryAdded } from "../lib/client.js";
-
-/** Generate a unique task ID */
-function genTaskId() {
-  return `task_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-}
+import { generateTaskId } from "../lib/utils.js";
 
 const THROTTLE_MS = 5 * 60 * 1000; // 5 min
 
@@ -71,7 +67,7 @@ export function createFactExtractionHandler(state) {
 
           // Populate TickTick-aligned fields for auto-extracted tasks
           if (memType === "task") {
-            info.task_id = genTaskId();
+            info.task_id = generateTaskId();
             info.task_status = "pending";
             info.title = mem.title || mem.content;
             if (mem.priority) info.priority = mem.priority;

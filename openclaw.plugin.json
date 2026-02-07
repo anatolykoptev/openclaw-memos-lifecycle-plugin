@@ -2,7 +2,7 @@
   "id": "openclaw-memos-lifecycle-plugin",
   "name": "MemOS Lifecycle",
   "description": "Memory bridge between OpenClaw and MemOS — smart context injection, compaction flush, fact extraction, tool traces, task management",
-  "version": "3.0.0",
+  "version": "3.1.0",
   "configSchema": {
     "type": "object",
     "properties": {
