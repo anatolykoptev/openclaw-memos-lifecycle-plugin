@@ -1,8 +1,8 @@
 /**
- * MemOS Lifecycle Plugin v3.1
+ * MemOS Lifecycle Plugin v3.2
  *
  * Production-grade memory bridge between OpenClaw and MemOS.
- * Typed memory extraction, task lifecycle, todo auto-remind.
+ * Typed memory extraction, task lifecycle, LLM reranker, todo auto-remind.
  *
  * Hook pipeline:
  *   before_agent_start  → smart retrieval → inject memories + todo auto-remind
@@ -26,6 +26,7 @@
  *   lib/task-manager.js   — task CRUD with append-only reconciliation
  *   lib/summarize.js      — conversation summarization + fact extraction
  *   lib/retrieval.js      — smart retrieval pipeline
+ *   lib/reranker.js       — LLM-based relevance filtering of search results
  *   lib/memory-types.js   — memory type definitions and prompts
  *   lib/typed-extraction.js — typed memory extraction logic
  *
@@ -47,6 +48,7 @@ const POST_COMPACTION_WINDOW_MS = 2 * 60 * 1000;
 const state = {
   lastCompactionTime: 0,
   compactionCount: 0,
+  rerankerEnabled: true,
   isPostCompaction() {
     return (
       this.lastCompactionTime > 0 &&
@@ -72,6 +74,7 @@ export default {
       compactionFlush: { type: "boolean", default: true },
       toolTraces: { type: "boolean", default: true },
       taskManager: { type: "boolean", default: true },
+      reranker: { type: "boolean", default: true },
     },
     additionalProperties: false,
   },
@@ -79,9 +82,10 @@ export default {
   register(api) {
     const config = api.pluginConfig || {};
     applyConfig(config);
+    state.rerankerEnabled = config.reranker !== false;
 
     let hookCount = 0;
-    console.log(LOG_PREFIX, "Registering lifecycle plugin v3.1 (utils consolidation + getter migration)...");
+    console.log(LOG_PREFIX, "Registering lifecycle plugin v3.2 (LLM reranker)...");
 
     if (config.contextInjection !== false) {
       api.on("before_agent_start", createContextInjectionHandler(state));
@@ -156,6 +160,6 @@ export default {
       console.log(LOG_PREFIX, "Task management tools registered (create/complete/list)");
     }
 
-    console.log(LOG_PREFIX, `Lifecycle plugin v3.1 registered (${hookCount} hooks active)`);
+    console.log(LOG_PREFIX, `Lifecycle plugin v3.2 registered (${hookCount} hooks active)`);
   },
 };

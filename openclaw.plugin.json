@@ -2,7 +2,7 @@
   "id": "openclaw-memos-lifecycle-plugin",
   "name": "MemOS Lifecycle",
   "description": "Memory bridge between OpenClaw and MemOS — smart context injection, compaction flush, fact extraction, tool traces, task management",
-  "version": "3.1.0",
+  "version": "3.2.0",
   "configSchema": {
     "type": "object",
     "properties": {
@@ -48,6 +48,11 @@
       "taskManager": {
         "type": "boolean",
         "description": "Enable task management tools (create/complete/list)",
+        "default": true
+      },
+      "reranker": {
+        "type": "boolean",
+        "description": "Enable LLM reranking of search results to filter irrelevant memories",
         "default": true
       }
     },
@@ -96,6 +101,10 @@
     "taskManager": {
       "label": "Task Manager",
       "help": "Enable task management tools for creating, completing, and listing tasks"
+    },
+    "reranker": {
+      "label": "LLM Reranker",
+      "help": "Use LLM to filter out irrelevant search results before context injection (adds ~2-4s latency)"
     }
   }
 }

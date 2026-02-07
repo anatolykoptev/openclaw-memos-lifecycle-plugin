@@ -2,6 +2,20 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.2.0] — 2026-02-07
+
+### Added
+- **LLM Reranker** (`lib/reranker.js`) — filters irrelevant memories using Gemini (via MemOS `/product/chat/complete`) before context injection
+  - Binary relevance judgement: returns only indices of relevant memories
+  - Non-fatal: falls back to unfiltered results on any failure
+  - Skips reranking when fewer than 3 memories (not worth the latency)
+- **`Timeouts.RERANK`** (10s) — dedicated timeout for LLM reranking calls
+- **`reranker` config toggle** — enable/disable in `openclaw.plugin.json` (default: `true`)
+
+### Changed
+- Search `topK` increased: 8→12 (normal), 10→14 (force), 6→8 (post-compaction per search) — over-fetch for reranker to filter down
+- Post-compaction path now also runs reranker after dedup merge
+
 ## [3.1.0] — 2026-02-07
 
 ### Added

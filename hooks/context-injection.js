@@ -23,6 +23,7 @@ import {
   rewriteQuery,
   filterBySufficiency,
 } from "../lib/retrieval.js";
+import { rerankMemories } from "../lib/reranker.js";
 import { findTasks, formatTaskList } from "../lib/task-manager.js";
 
 // ─── Todo Auto-Remind Config ────────────────────────────────────────
@@ -62,10 +63,10 @@ export function createContextInjectionHandler(state) {
         const [summaries, relevant] = await Promise.all([
           searchMemories(
             "compaction summary decisions progress pending tasks",
-            6,
+            8,
             { filter: { _type: "compaction_summary" } },
           ).catch(() => []),
-          searchMemories(enrichedQuery, 6).catch(() => []),
+          searchMemories(enrichedQuery, 8).catch(() => []),
         ]);
 
         const seen = new Set();
@@ -76,13 +77,22 @@ export function createContextInjectionHandler(state) {
             memories.push(m);
           }
         }
+
+        if (state.rerankerEnabled) {
+          memories = await rerankMemories(enrichedQuery, memories);
+        }
       } else {
         // ── Step 2: Query rewriting ──
         const searchQuery = rewriteQuery(event.prompt, false);
-        const topK = decision === "force" ? 10 : 8;
+        const topK = decision === "force" ? 14 : 12;
 
         // ── Step 3: Semantic search ──
         memories = await searchMemories(searchQuery, topK);
+
+        // ── Step 3.5: LLM reranking ──
+        if (state.rerankerEnabled) {
+          memories = await rerankMemories(searchQuery, memories);
+        }
       }
 
       // ── Step 4: Sufficiency filtering ──
