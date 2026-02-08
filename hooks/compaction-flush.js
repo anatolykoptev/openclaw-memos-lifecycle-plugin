@@ -15,6 +15,7 @@ import { addMemory, addMemoryAwait } from "../lib/memory.js";
 import { summarizeConversation, flattenMessages } from "../lib/summarize.js";
 import { LOG_PREFIX, isDuplicateMemory, markMemoryAdded } from "../lib/client.js";
 import { segmentConversation } from "../lib/retrieval.js";
+import { inc, timing } from "../lib/stats.js";
 
 /**
  * Rough token estimate from message character count.
@@ -60,6 +61,7 @@ export function createBeforeCompactionHandler(state) {
       return;
     }
 
+    const t0 = Date.now();
     try {
       // Segment long conversations for better extraction quality
       const flat = flattenMessages(messages);
@@ -93,13 +95,16 @@ export function createBeforeCompactionHandler(state) {
           try {
             if (isDuplicateMemory(entry.content)) {
               skipped++;
+              inc("compaction.entriesSkipped");
               return;
             }
             await addMemoryAwait(entry.content, entry.tags);
             markMemoryAdded(entry.content);
             saved++;
+            inc("compaction.entriesSaved");
           } catch (err) {
             failed++;
+            inc("compaction.entriesFailed");
             console.warn(LOG_PREFIX, "Failed to save entry:", err.message);
           }
         }),
@@ -120,6 +125,8 @@ export function createBeforeCompactionHandler(state) {
           ts: new Date().toISOString(),
         },
       );
+
+      timing("compaction", Date.now() - t0);
 
       console.log(
         LOG_PREFIX,

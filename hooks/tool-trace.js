@@ -11,6 +11,7 @@
 import { addMemory } from "../lib/memory.js";
 import { extractSkillFromTool } from "../lib/typed-extraction.js";
 import { LOG_PREFIX } from "../lib/client.js";
+import { inc } from "../lib/stats.js";
 
 const SKIP_PREFIXES = ["memos", "memory"];
 
@@ -37,6 +38,7 @@ export async function handleToolTrace(event, ctx) {
   const success = !event?.error && event?.message;
 
   // Save tool trace
+  inc("toolTrace.count");
   addMemory(
     JSON.stringify({
       type: "tool_trace",
@@ -67,6 +69,7 @@ export async function handleToolTrace(event, ctx) {
         if (skill) {
           console.log(LOG_PREFIX, `Extracted skill from ${toolName}`);
           addMemory(skill.content, skill.tags);
+          inc("toolTrace.skillsExtracted");
           recentExecutions.set(toolName, now);
           // Cleanup old entries
           if (recentExecutions.size > 100) {

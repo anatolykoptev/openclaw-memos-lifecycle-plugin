@@ -2,6 +2,39 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.4.0] — 2026-02-07
+
+### Added
+- **TickTick project sync** (`lib/ticktick.js`) — direct REST API client for TickTick
+  - Dynamic project resolution: fetches projects from TickTick API, matches by name (case-insensitive, emoji-stripped)
+  - `fetchProjects()` — cached (5 min TTL), `resolveProjectId(name)`, `resolveOrCreateProject(name)`
+  - Priority mapping: MemOS P0/P1/P2 ↔ TickTick 5/3/1
+  - Token loaded from `TICKTICK_ACCESS_TOKEN` env or `~/.openclaw/mcp-servers/ticktick-mcp/.env`
+- **`memos_list_projects` tool** — lists TickTick projects dynamically from API
+- **`ticktickSync` config toggle** — enable/disable TickTick integration (default: `true`)
+- **TickTick stats** — `ticktick.taskCreated`, `taskCompleted`, `projectsResolved`, `projectsCreated`, `errors`
+
+### Changed
+- `memos_create_task` now fire-and-forget syncs to TickTick when project is specified
+- Cron job `ticktick-memos-sync` rewritten for multi-project dynamic sync (no hardcoded project IDs)
+
+## [3.3.0] — 2026-02-07
+
+### Added
+- **Operation statistics** (`lib/stats.js`) — lightweight in-memory counters and timings for all plugin operations
+  - Search call count, avg latency, errors
+  - Rerank call count, avg latency, kept/total ratio
+  - Injection decisions (skip/retrieve/force), post-compaction, memories injected
+  - Extraction runs, throttle skips, dedup skips, saved count, per-type breakdown
+  - Compaction runs, avg duration, entries saved/skipped/failed
+  - Tool trace count, skills extracted
+- **`memos_stats` agent tool** — returns formatted stats + raw snapshot, optional `reset` param to zero counters
+- **Periodic stats log** — `formatStats()` logged every 30 minutes via `setInterval`
+- Exports: `inc(path, n)`, `timing(path, ms)`, `getStats()`, `formatStats()`, `resetStats()`
+
+### Changed
+- All hooks instrumented with stats counters (context-injection, fact-extraction, compaction-flush, tool-trace)
+
 ## [3.2.0] — 2026-02-07
 
 ### Added

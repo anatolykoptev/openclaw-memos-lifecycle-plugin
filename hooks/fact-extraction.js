@@ -15,6 +15,8 @@ import { flattenMessages } from "../lib/summarize.js";
 import { extractAllTypedMemories } from "../lib/typed-extraction.js";
 import { LOG_PREFIX, isDuplicateMemory, markMemoryAdded } from "../lib/client.js";
 import { generateTaskId } from "../lib/utils.js";
+import { inc } from "../lib/stats.js";
+import { normalizeDate } from "../lib/ticktick.js";
 
 const THROTTLE_MS = 5 * 60 * 1000; // 5 min
 
@@ -34,7 +36,10 @@ export function createFactExtractionHandler(state) {
     }
 
     const now = Date.now();
-    if (now - lastRunTime < THROTTLE_MS) return;
+    if (now - lastRunTime < THROTTLE_MS) {
+      inc("extraction.throttled");
+      return;
+    }
     lastRunTime = now;
 
     const flat = flattenMessages(event.messages);
@@ -46,6 +51,7 @@ export function createFactExtractionHandler(state) {
         .map((m) => `${m.role}: ${m.text}`)
         .join("\n\n");
 
+      inc("extraction.count");
       console.log(LOG_PREFIX, "Extracting typed memories from conversation...");
       const memories = await extractAllTypedMemories(text);
 
@@ -60,6 +66,7 @@ export function createFactExtractionHandler(state) {
 
           if (isDuplicateMemory(contentText, memType)) {
             skipped++;
+            inc("extraction.dedupSkips");
             continue;
           }
 
@@ -71,7 +78,7 @@ export function createFactExtractionHandler(state) {
             info.task_status = "pending";
             info.title = mem.title || mem.content;
             if (mem.priority) info.priority = mem.priority;
-            if (mem.due_date) info.due_date = mem.due_date;
+            if (mem.due_date) info.due_date = normalizeDate(mem.due_date) || mem.due_date;
             if (mem.project) info.project = mem.project;
             if (mem.desc) info.desc = mem.desc;
           }
@@ -79,6 +86,8 @@ export function createFactExtractionHandler(state) {
           addMemory(contentText, mem.tags, info);
           markMemoryAdded(contentText, memType);
           saved++;
+          inc("extraction.memoriesSaved");
+          inc(`extraction.byType.${memType}`);
         }
         if (saved > 0 || skipped > 0) {
           console.log(LOG_PREFIX, `Typed memories: ${saved} saved, ${skipped} skipped (duplicates)`);

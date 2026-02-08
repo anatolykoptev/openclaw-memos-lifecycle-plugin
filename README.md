@@ -14,6 +14,7 @@ MemOS stores and retrieves memories. OpenClaw runs agents. But MemOS doesn't kno
 
 | Feature | Description | Since |
 |---------|-------------|-------|
+| **Operation stats** | In-memory counters and timings; `memos_stats` tool + periodic 30-min log | v3.3 |
 | **LLM reranker** | Filters irrelevant search results via LLM before injection; over-fetches (top_k=12) then keeps only relevant memories | v3.2 |
 | **Task management** | Create, complete, list tasks via agent tools; append-only reconciliation on MemOS | v3.0 |
 | **Typed memory extraction** | Memories categorized into 5 types (profile, behavior, skill, event, task) | v3.0 |
@@ -94,6 +95,7 @@ lib/
   summarize.js                   Conversation summarization + fact extraction
   retrieval.js                   Smart retrieval (pre-decision, rewriting, filtering)
   reranker.js                    LLM-based relevance filtering of search results
+  stats.js                       In-memory operation counters and timings
   memory-types.js                Memory type definitions and extraction prompts
   typed-extraction.js            Typed memory extraction logic
 ```
@@ -146,6 +148,7 @@ Inspired by [memU](https://github.com/NevaMind-AI/memU):
 | `memos_create_task` | `title`, `desc?`, `priority?`, `due_date?`, `start_date?`, `project?`, `items?`, `context?` | Create a task |
 | `memos_complete_task` | `task_id`, `outcome?` | Mark task completed |
 | `memos_list_tasks` | `status?`, `priority?`, `project?` | List/filter tasks |
+| `memos_stats` | `reset?` | Show operation statistics (optionally reset) |
 
 Task fields are aligned with [TickTick](https://developer.ticktick.com/) API.
 

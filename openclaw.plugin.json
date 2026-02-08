@@ -2,7 +2,7 @@
   "id": "openclaw-memos-lifecycle-plugin",
   "name": "MemOS Lifecycle",
   "description": "Memory bridge between OpenClaw and MemOS — smart context injection, compaction flush, fact extraction, tool traces, task management",
-  "version": "3.2.0",
+  "version": "3.4.0",
   "configSchema": {
     "type": "object",
     "properties": {
@@ -53,6 +53,11 @@
       "reranker": {
         "type": "boolean",
         "description": "Enable LLM reranking of search results to filter irrelevant memories",
+        "default": true
+      },
+      "ticktickSync": {
+        "type": "boolean",
+        "description": "Enable TickTick integration: sync tasks by project, resolve project IDs dynamically via TickTick API",
         "default": true
       }
     },
@@ -105,6 +110,10 @@
     "reranker": {
       "label": "LLM Reranker",
       "help": "Use LLM to filter out irrelevant search results before context injection (adds ~2-4s latency)"
+    },
+    "ticktickSync": {
+      "label": "TickTick Sync",
+      "help": "Sync tasks to/from TickTick, resolving projects dynamically by name (needs TICKTICK_ACCESS_TOKEN)"
     }
   }
 }

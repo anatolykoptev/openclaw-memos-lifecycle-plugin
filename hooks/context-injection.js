@@ -25,6 +25,7 @@ import {
 } from "../lib/retrieval.js";
 import { rerankMemories } from "../lib/reranker.js";
 import { findTasks, formatTaskList } from "../lib/task-manager.js";
+import { inc, timing } from "../lib/stats.js";
 
 // ─── Todo Auto-Remind Config ────────────────────────────────────────
 const TODO_REMIND_COOLDOWN_MS = 30 * 60 * 1000; // 30 min between reminds
@@ -43,6 +44,7 @@ export function createContextInjectionHandler(state) {
     const decision = postCompaction ? "force" : preRetrievalDecision(event.prompt);
 
     if (decision === "skip") {
+      inc("injection.skip");
       console.log(LOG_PREFIX, "Pre-retrieval: skipping (casual/greeting)");
       return;
     }
@@ -57,9 +59,11 @@ export function createContextInjectionHandler(state) {
 
       if (postCompaction) {
         // ── Post-compaction: enriched mode ──
+        inc("injection.postCompaction");
         console.log(LOG_PREFIX, "Post-compaction mode: fetching enriched context");
         const enrichedQuery = rewriteQuery(event.prompt, true);
 
+        const t0s = Date.now();
         const [summaries, relevant] = await Promise.all([
           searchMemories(
             "compaction summary decisions progress pending tasks",
@@ -68,6 +72,7 @@ export function createContextInjectionHandler(state) {
           ).catch(() => []),
           searchMemories(enrichedQuery, 8).catch(() => []),
         ]);
+        timing("search", Date.now() - t0s);
 
         const seen = new Set();
         for (const m of [...summaries, ...relevant]) {
@@ -79,7 +84,12 @@ export function createContextInjectionHandler(state) {
         }
 
         if (state.rerankerEnabled) {
+          const t0r = Date.now();
+          const before = memories.length;
           memories = await rerankMemories(enrichedQuery, memories);
+          timing("rerank", Date.now() - t0r);
+          inc("rerank.kept", memories.length);
+          inc("rerank.total", before);
         }
       } else {
         // ── Step 2: Query rewriting ──
@@ -87,11 +97,18 @@ export function createContextInjectionHandler(state) {
         const topK = decision === "force" ? 14 : 12;
 
         // ── Step 3: Semantic search ──
+        const t0s = Date.now();
         memories = await searchMemories(searchQuery, topK);
+        timing("search", Date.now() - t0s);
 
         // ── Step 3.5: LLM reranking ──
         if (state.rerankerEnabled) {
+          const t0r = Date.now();
+          const before = memories.length;
           memories = await rerankMemories(searchQuery, memories);
+          timing("rerank", Date.now() - t0r);
+          inc("rerank.kept", memories.length);
+          inc("rerank.total", before);
         }
       }
 
@@ -133,6 +150,10 @@ export function createContextInjectionHandler(state) {
       if (contextBlock) parts.push(contextBlock);
       if (todoReminder) parts.push(todoReminder);
 
+      inc("injection.count");
+      inc(`injection.${decision}`);
+      inc("injection.memoriesInjected", memories.length);
+
       console.log(
         LOG_PREFIX,
         `Injecting ${memories.length} memories (${postCompaction ? "post-compaction" : "normal"}, decision=${decision})${todoReminder ? " + todo reminder" : ""}`,
@@ -142,6 +163,7 @@ export function createContextInjectionHandler(state) {
         prependContext: `<user_memory_context>\n${parts.join("\n\n")}\n</user_memory_context>`,
       };
     } catch (err) {
+      inc("search.errors");
       console.warn(LOG_PREFIX, "Context injection failed:", err.message);
     }
   };
