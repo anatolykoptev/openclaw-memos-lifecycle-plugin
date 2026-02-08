@@ -7,10 +7,10 @@
  *
  * Hook pipeline:
  *   before_agent_start  → smart retrieval → inject memories + todo auto-remind
- *   agent_end           → extract typed memories (profile/behavior/skill/event/task)
+ *   agent_end           → extract typed memories (profile/behavior/event/task)
  *   before_compaction   → segment conversation → summarize → persist
  *   after_compaction    → mark post-compaction state
- *   tool_result_persist → capture tool traces + extract skills from complex operations
+ *   tool_result_persist → capture tool traces
  *
  * Tools:
  *   memos_create_task   → create a task with priority/deadline
