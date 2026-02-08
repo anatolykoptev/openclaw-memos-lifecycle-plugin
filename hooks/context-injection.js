@@ -102,7 +102,7 @@ export function createContextInjectionHandler(state) {
       } else {
         // ── Step 2: Query rewriting ──
         const searchQuery = rewriteQuery(event.prompt, false);
-        const topK = decision === "force" ? 14 : 12;
+        const topK = decision === "force" ? 10 : 8;
 
         // ── Step 3: Semantic search ──
         const t0s = Date.now();
@@ -127,7 +127,7 @@ export function createContextInjectionHandler(state) {
       // ── Step 4: Sufficiency filtering (text memories) ──
       memories = filterBySufficiency(memories, {
         minLength: 20,
-        maxDuplicateOverlap: 0.65,
+        maxDuplicateOverlap: 0.80,
       });
 
       const hasAny = memories.length > 0 || skillMemories.length > 0 || prefMemories.length > 0;

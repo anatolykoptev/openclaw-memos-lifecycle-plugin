@@ -65,7 +65,7 @@ const state = {
   lastCompactionTime: 0,
   compactionCount: 0,
   lastTodoRemindTime: 0,
-  rerankerEnabled: true,
+  rerankerEnabled: false,
   ticktickSyncEnabled: false,
   isPostCompaction() {
     return (
@@ -93,7 +93,7 @@ export default {
       compactionFlush: { type: "boolean", default: true },
       toolTraces: { type: "boolean", default: true },
       taskManager: { type: "boolean", default: true },
-      reranker: { type: "boolean", default: true },
+      reranker: { type: "boolean", default: false },
       ticktickSync: { type: "boolean", default: true },
     },
     additionalProperties: false,
@@ -102,7 +102,7 @@ export default {
   register(api) {
     const config = api.pluginConfig || {};
     applyConfig(config);
-    state.rerankerEnabled = config.reranker !== false;
+    state.rerankerEnabled = config.reranker === true;
     state.ticktickSyncEnabled = config.ticktickSync !== false && isTickTickAvailable();
 
     let hookCount = 0;

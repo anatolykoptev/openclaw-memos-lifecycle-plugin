@@ -47,7 +47,7 @@ export function createFactExtractionHandler(state) {
 
     try {
       const text = flat
-        .slice(-12)
+        .slice(-20)
         .map((m) => `${m.role}: ${m.text}`)
         .join("\n\n");
 
