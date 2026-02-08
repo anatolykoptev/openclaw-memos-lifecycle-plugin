@@ -16,7 +16,7 @@
  * @module hooks/context-injection
  */
 import { isHealthy } from "../lib/health.js";
-import { searchMemories, formatContextBlock } from "../lib/search.js";
+import { searchMemories, formatContextBlock, formatSkillBlock, formatPrefBlock } from "../lib/search.js";
 import { LOG_PREFIX } from "../lib/client.js";
 import {
   preRetrievalDecision,
@@ -57,6 +57,9 @@ export function createContextInjectionHandler(state) {
     try {
       let memories = [];
 
+      let skillMemories = [];
+      let prefMemories = [];
+
       if (postCompaction) {
         // ── Post-compaction: enriched mode ──
         inc("injection.postCompaction");
@@ -64,18 +67,23 @@ export function createContextInjectionHandler(state) {
         const enrichedQuery = rewriteQuery(event.prompt, true);
 
         const t0s = Date.now();
-        const [summaries, relevant] = await Promise.all([
+        const emptyResult = { textMemories: [], skillMemories: [], prefMemories: [] };
+        const [summaryResult, relevantResult] = await Promise.all([
           searchMemories(
             "compaction summary decisions progress pending tasks",
             8,
             { filter: { _type: "compaction_summary" } },
-          ).catch(() => []),
-          searchMemories(enrichedQuery, 8).catch(() => []),
+          ).catch(() => emptyResult),
+          searchMemories(enrichedQuery, 8).catch(() => emptyResult),
         ]);
         timing("search", Date.now() - t0s);
 
+        // Merge skill + pref from both searches (deduped by content)
+        skillMemories = [...(summaryResult.skillMemories || []), ...(relevantResult.skillMemories || [])];
+        prefMemories = [...(summaryResult.prefMemories || []), ...(relevantResult.prefMemories || [])];
+
         const seen = new Set();
-        for (const m of [...summaries, ...relevant]) {
+        for (const m of [...(summaryResult.textMemories || []), ...(relevantResult.textMemories || [])]) {
           const key = (m.memory || m.content || "").slice(0, 100);
           if (key && !seen.has(key)) {
             seen.add(key);
@@ -98,10 +106,14 @@ export function createContextInjectionHandler(state) {
 
         // ── Step 3: Semantic search ──
         const t0s = Date.now();
-        memories = await searchMemories(searchQuery, topK);
+        const searchResult = await searchMemories(searchQuery, topK);
         timing("search", Date.now() - t0s);
 
-        // ── Step 3.5: LLM reranking ──
+        memories = searchResult.textMemories;
+        skillMemories = searchResult.skillMemories;
+        prefMemories = searchResult.prefMemories;
+
+        // ── Step 3.5: LLM reranking (text memories only) ──
         if (state.rerankerEnabled) {
           const t0r = Date.now();
           const before = memories.length;
@@ -112,24 +124,33 @@ export function createContextInjectionHandler(state) {
         }
       }
 
-      // ── Step 4: Sufficiency filtering ──
+      // ── Step 4: Sufficiency filtering (text memories) ──
       memories = filterBySufficiency(memories, {
         minLength: 20,
         maxDuplicateOverlap: 0.65,
       });
 
-      if (memories.length === 0) {
+      const hasAny = memories.length > 0 || skillMemories.length > 0 || prefMemories.length > 0;
+      if (!hasAny) {
         console.log(LOG_PREFIX, "No relevant memories after filtering");
         return;
       }
 
       // ── Step 5: Format and inject ──
       const contextBlock = formatContextBlock(memories, {
-        maxItems: postCompaction ? 12 : 8,
+        maxItems: postCompaction ? 12 : 6,
         maxChars: postCompaction ? 800 : 500,
         header: postCompaction
           ? "Context restored from MemOS after compaction:"
           : "Relevant memories from MemOS:",
+      });
+
+      const skillBlock = formatSkillBlock(skillMemories, {
+        maxItems: postCompaction ? 3 : 2,
+      });
+
+      const prefBlock = formatPrefBlock(prefMemories, {
+        maxItems: postCompaction ? 3 : 2,
       });
 
       // ── Step 6: Todo Auto-Remind (proactive) ──
@@ -144,22 +165,32 @@ export function createContextInjectionHandler(state) {
         }
       }
 
-      if (!contextBlock && !todoReminder) return;
+      if (!contextBlock && !skillBlock && !prefBlock && !todoReminder) return;
 
       const parts = [];
       if (contextBlock) parts.push(contextBlock);
+      if (skillBlock) parts.push(skillBlock);
+      if (prefBlock) parts.push(prefBlock);
       if (todoReminder) parts.push(todoReminder);
 
       inc("injection.count");
       inc(`injection.${decision}`);
       inc("injection.memoriesInjected", memories.length);
+      if (skillMemories.length) inc("injection.skillMemories", skillMemories.length);
+      if (prefMemories.length) inc("injection.prefMemories", prefMemories.length);
 
       const contextStr = parts.join("\n\n");
       timing("hooks", Date.now() - t0hook);
 
+      const extras = [
+        skillMemories.length ? `${skillMemories.length} skills` : "",
+        prefMemories.length ? `${prefMemories.length} prefs` : "",
+        todoReminder ? "todo" : "",
+      ].filter(Boolean).join(", ");
+
       console.log(
         LOG_PREFIX,
-        `Injecting ${memories.length} memories (${postCompaction ? "post-compaction" : "normal"}, decision=${decision}, ${contextStr.length} chars)${todoReminder ? " + todo reminder" : ""}`,
+        `Injecting ${memories.length} memories (${postCompaction ? "post-compaction" : "normal"}, decision=${decision}, ${contextStr.length} chars)${extras ? ` + ${extras}` : ""}`,
       );
 
       return {
