@@ -1,5 +1,5 @@
 /**
- * MemOS Lifecycle Plugin v3.4
+ * MemOS Lifecycle Plugin v3.5.1
  *
  * Production-grade memory bridge between OpenClaw and MemOS.
  * Typed memory extraction, task lifecycle, LLM reranker, operation stats,
