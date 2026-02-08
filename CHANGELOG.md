@@ -2,6 +2,25 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.4.1] — 2026-02-07
+
+### Fixed
+- **Dedup cache memory leak** (`client.js`) — hard limit 200 entries with aggressive cleanup on every add (was unbounded, cleanup only at >500)
+- **Task reconciliation bug** (`task-manager.js`) — handle missing `task_completed_at` in update comparison; updates without dates no longer silently dropped
+- **Race condition in todo auto-remind** (`context-injection.js`) — moved `lastTodoRemindTime` from module-level into shared `state` object with set-before-await pattern
+- **Task dedup on rapid double create** (`task-manager.js`) — `createTask()` now checks dedup cache before generating task ID
+- **TickTick token cached forever** (`ticktick.js`) — retry loading token every 60s if null (was: cached permanently after first check)
+- **TickTick project cache not invalidated on error** (`ticktick.js`) — clear `_projectCache` on fetch error so next call retries
+- **Health check too aggressive** (`health.js`) — increased timeout 2s→3s, added 1 retry with 500ms delay, reduced cache TTL 60s→30s
+- **Compaction flush: silent failures** (`compaction-flush.js`) — now logs content preview of failed entries
+
+### Changed
+- **Reranker** (`reranker.js`) — added 1 retry (was: 0 retries, immediate fallback to unfiltered)
+- **Stats min/max** (`stats.js`) — `timing()` now tracks `minMs`/`maxMs` for search, rerank, compaction, hooks; shown in `formatStats()` as range `[min–max]`
+- **Hook total timing** — context-injection now records total hook duration via `timing("hooks", ...)`
+- **Context size logging** — injection log now includes `chars` count of injected context block
+- **`memosCubeId`** added to `configSchema` in `index.js` (was missing from UI config)
+
 ## [3.4.0] — 2026-02-07
 
 ### Added

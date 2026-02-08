@@ -29,7 +29,6 @@ import { inc, timing } from "../lib/stats.js";
 
 // ─── Todo Auto-Remind Config ────────────────────────────────────────
 const TODO_REMIND_COOLDOWN_MS = 30 * 60 * 1000; // 30 min between reminds
-let lastTodoRemindTime = 0;
 
 /**
  * @param {object} state - Shared plugin state
@@ -54,6 +53,7 @@ export function createContextInjectionHandler(state) {
       return;
     }
 
+    const t0hook = Date.now();
     try {
       let memories = [];
 
@@ -135,11 +135,11 @@ export function createContextInjectionHandler(state) {
       // ── Step 6: Todo Auto-Remind (proactive) ──
       let todoReminder = "";
       const now = Date.now();
-      if (now - lastTodoRemindTime > TODO_REMIND_COOLDOWN_MS) {
+      if (now - state.lastTodoRemindTime > TODO_REMIND_COOLDOWN_MS) {
+        state.lastTodoRemindTime = now; // set first to prevent race
         const pendingTasks = await findTasks({ status: "pending" });
         if (pendingTasks.length > 0) {
           todoReminder = formatTaskList(pendingTasks);
-          lastTodoRemindTime = now;
           console.log(LOG_PREFIX, `Todo Auto-Remind: ${pendingTasks.length} pending tasks`);
         }
       }
@@ -154,13 +154,16 @@ export function createContextInjectionHandler(state) {
       inc(`injection.${decision}`);
       inc("injection.memoriesInjected", memories.length);
 
+      const contextStr = parts.join("\n\n");
+      timing("hooks", Date.now() - t0hook);
+
       console.log(
         LOG_PREFIX,
-        `Injecting ${memories.length} memories (${postCompaction ? "post-compaction" : "normal"}, decision=${decision})${todoReminder ? " + todo reminder" : ""}`,
+        `Injecting ${memories.length} memories (${postCompaction ? "post-compaction" : "normal"}, decision=${decision}, ${contextStr.length} chars)${todoReminder ? " + todo reminder" : ""}`,
       );
 
       return {
-        prependContext: `<user_memory_context>\n${parts.join("\n\n")}\n</user_memory_context>`,
+        prependContext: `<user_memory_context>\n${contextStr}\n</user_memory_context>`,
       };
     } catch (err) {
       inc("search.errors");

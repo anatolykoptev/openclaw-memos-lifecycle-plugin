@@ -64,6 +64,7 @@ const POST_COMPACTION_WINDOW_MS = 2 * 60 * 1000;
 const state = {
   lastCompactionTime: 0,
   compactionCount: 0,
+  lastTodoRemindTime: 0,
   rerankerEnabled: true,
   ticktickSyncEnabled: false,
   isPostCompaction() {
@@ -85,6 +86,7 @@ export default {
     properties: {
       memosApiUrl: { type: "string", default: "http://127.0.0.1:8000" },
       memosUserId: { type: "string", default: "default" },
+      memosCubeId: { type: "string", default: "default" },
       internalServiceSecret: { type: "string" },
       contextInjection: { type: "boolean", default: true },
       factExtraction: { type: "boolean", default: true },

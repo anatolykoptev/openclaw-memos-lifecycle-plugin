@@ -105,7 +105,7 @@ export function createBeforeCompactionHandler(state) {
           } catch (err) {
             failed++;
             inc("compaction.entriesFailed");
-            console.warn(LOG_PREFIX, "Failed to save entry:", err.message);
+            console.warn(LOG_PREFIX, `Failed to save entry: ${err.message} — "${(entry.content || "").slice(0, 80)}"`);
           }
         }),
       );
