@@ -7,16 +7,25 @@ All notable changes to this project will be documented in this file.
 ### Added
 - **TickTick project sync** (`lib/ticktick.js`) — direct REST API client for TickTick
   - Dynamic project resolution: fetches projects from TickTick API, matches by name (case-insensitive, emoji-stripped)
-  - `fetchProjects()` — cached (5 min TTL), `resolveProjectId(name)`, `resolveOrCreateProject(name)`
+  - `fetchProjects()` — cached (5 min TTL), `resolveProjectId(name)`, `resolveOrFallback(name)`
   - Priority mapping: MemOS P0/P1/P2 ↔ TickTick 5/3/1
   - Token loaded from `TICKTICK_ACCESS_TOKEN` env or `~/.openclaw/mcp-servers/ticktick-mcp/.env`
+- **`normalizeDate()`** — all dates (MemOS + TickTick) normalized to TickTick ISO format (`2026-02-10T00:00:00+0000`)
 - **`memos_list_projects` tool** — lists TickTick projects dynamically from API
 - **`ticktickSync` config toggle** — enable/disable TickTick integration (default: `true`)
-- **TickTick stats** — `ticktick.taskCreated`, `taskCompleted`, `projectsResolved`, `projectsCreated`, `errors`
+- **TickTick stats** — `ticktick.taskCreated`, `taskCompleted`, `projectsResolved`, `errors`
+- **Fallback with tags** — when TickTick project not found, task syncs to Personal with original project name as tag
 
 ### Changed
-- `memos_create_task` now fire-and-forget syncs to TickTick when project is specified
+- `memos_create_task` now fire-and-forget syncs to TickTick with all fields (title, desc, priority, dueDate, startDate)
 - Cron job `ticktick-memos-sync` rewritten for multi-project dynamic sync (no hardcoded project IDs)
+- TickTick is single source of truth for projects — no auto-create, agent asks user to create manually if needed
+
+### Fixed
+- **`created_at` → `task_created_at`** in task info — MemOS silently drops `created_at` (reserved by `metadata.created_at`)
+- **`completed_at` → `task_completed_at`** in task info — same reserved key collision as `created_at`
+- **`ticktickFetch()` empty body handling** — TickTick complete endpoint returns HTTP 200 with empty body; was crashing on `res.json()`, now parses `text()` first
+- **TickTick `POST /project` returns 500** — documented as known TickTick API bug; `resolveOrFallback()` gracefully falls back to default project instead of crashing
 
 ## [3.3.0] — 2026-02-07
 
