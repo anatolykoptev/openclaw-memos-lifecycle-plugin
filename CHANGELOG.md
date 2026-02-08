@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.5.1] — 2026-02-07
+
+### Changed
+- **Skill extraction removed from plugin** — MemOS Skill Memory is now the sole self-learning mechanism; plugin no longer duplicates skill extraction
+- **Default user_id/cube_id** (`client.js`) — changed from `"default"` to `"memos"` (unified user identity)
+- **Skill/preference memory in context injection** — searches MemOS for all 3 memory types (text, skill, preference) with MMR dedup
+- **`searchMemories()`** returns `{textMemories, skillMemories, prefMemories}` object; `searchTextMemories()` for legacy flat-array callers
+- **`formatSkillBlock()`**, **`formatPrefBlock()`** — new formatters for structured skill and preference display in context
+
+### Removed
+- `MemoryTypes.SKILL` and skill extraction prompt from `memory-types.js`
+- `extractSkillFromTool()` from `typed-extraction.js` — was extracting skills from tool executions into text memories with `agent_skill` tags
+- Skill extraction logic from `tool-trace.js` — cooldown map, LLM call, save; hook now only captures traces
+- `skillsExtracted` counter from `stats.js`
+- `skill-learning` keyword from `package.json`
+
 ## [3.4.1] — 2026-02-07
 
 ### Fixed
@@ -55,7 +71,7 @@ All notable changes to this project will be documented in this file.
   - Injection decisions (skip/retrieve/force), post-compaction, memories injected
   - Extraction runs, throttle skips, dedup skips, saved count, per-type breakdown
   - Compaction runs, avg duration, entries saved/skipped/failed
-  - Tool trace count, skills extracted
+  - Tool trace count
 - **`memos_stats` agent tool** — returns formatted stats + raw snapshot, optional `reset` param to zero counters
 - **Periodic stats log** — `formatStats()` logged every 30 minutes via `setInterval`
 - Exports: `inc(path, n)`, `timing(path, ms)`, `getStats()`, `formatStats()`, `resetStats()`
