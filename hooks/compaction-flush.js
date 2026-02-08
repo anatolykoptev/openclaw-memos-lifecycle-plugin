@@ -13,7 +13,7 @@
 import { isHealthy } from "../lib/health.js";
 import { addMemory, addMemoryAwait } from "../lib/memory.js";
 import { summarizeConversation, flattenMessages } from "../lib/summarize.js";
-import { LOG_PREFIX, isDuplicateMemory, markMemoryAdded } from "../lib/client.js";
+import { LOG_PREFIX, isDuplicateMemory, markMemoryAdded, callApi, getMemosUserId, getMemosCubeId, Timeouts } from "../lib/client.js";
 import { segmentConversation } from "../lib/retrieval.js";
 import { inc, timing } from "../lib/stats.js";
 
@@ -132,6 +132,24 @@ export function createBeforeCompactionHandler(state) {
         LOG_PREFIX,
         `Compaction flush: ${saved} saved, ${skipped} skipped, ${failed} failed (#${state.compactionCount})`,
       );
+
+      // Send structured messages for preference memory extraction (fire-and-forget)
+      // Requires messages as [{role, content}] array — string skips pref extraction
+      const chatMessages = flat.slice(-20).map((m) => ({ role: m.role, content: m.text.slice(0, 2000) }));
+      if (chatMessages.length >= 4) {
+        callApi(
+          "/product/add",
+          {
+            user_id: getMemosUserId(),
+            writable_cube_ids: [getMemosCubeId()],
+            messages: chatMessages,
+          },
+          { timeoutMs: Timeouts.ADD },
+        ).catch((err) => {
+          console.warn(LOG_PREFIX, "Preference extraction call failed:", err.message);
+        });
+        inc("compaction.prefExtraction");
+      }
     } catch (err) {
       console.error(LOG_PREFIX, "Compaction flush failed:", err.message);
     }

@@ -28,7 +28,7 @@ import { findTasks, formatTaskList } from "../lib/task-manager.js";
 import { inc, timing } from "../lib/stats.js";
 
 // ─── Todo Auto-Remind Config ────────────────────────────────────────
-const TODO_REMIND_COOLDOWN_MS = 30 * 60 * 1000; // 30 min between reminds
+const TODO_REMIND_COOLDOWN_MS = 5 * 60 * 1000; // 5 min between reminds (tasks are lightweight)
 
 /**
  * @param {object} state - Shared plugin state
@@ -131,10 +131,6 @@ export function createContextInjectionHandler(state) {
       });
 
       const hasAny = memories.length > 0 || skillMemories.length > 0 || prefMemories.length > 0;
-      if (!hasAny) {
-        console.log(LOG_PREFIX, "No relevant memories after filtering");
-        return;
-      }
 
       // ── Step 5: Format and inject ──
       const contextBlock = formatContextBlock(memories, {
@@ -153,19 +149,23 @@ export function createContextInjectionHandler(state) {
         maxItems: postCompaction ? 3 : 2,
       });
 
-      // ── Step 6: Todo Auto-Remind (proactive) ──
+      // ── Step 6: Todo Auto-Remind (always, with short cooldown) ──
       let todoReminder = "";
       const now = Date.now();
       if (now - state.lastTodoRemindTime > TODO_REMIND_COOLDOWN_MS) {
-        state.lastTodoRemindTime = now; // set first to prevent race
-        const pendingTasks = await findTasks({ status: "pending" });
-        if (pendingTasks.length > 0) {
-          todoReminder = formatTaskList(pendingTasks);
-          console.log(LOG_PREFIX, `Todo Auto-Remind: ${pendingTasks.length} pending tasks`);
+        try {
+          const pendingTasks = await findTasks({ status: "pending" });
+          if (pendingTasks.length > 0) {
+            todoReminder = formatTaskList(pendingTasks);
+            console.log(LOG_PREFIX, `Todo Auto-Remind: ${pendingTasks.length} pending tasks`);
+          }
+          state.lastTodoRemindTime = now; // set AFTER success, so retries on failure
+        } catch (taskErr) {
+          console.warn(LOG_PREFIX, `Todo Auto-Remind failed (will retry next prompt): ${taskErr.message}`);
         }
       }
 
-      if (!contextBlock && !skillBlock && !prefBlock && !todoReminder) return;
+      if (!hasAny && !todoReminder) return;
 
       const parts = [];
       if (contextBlock) parts.push(contextBlock);
