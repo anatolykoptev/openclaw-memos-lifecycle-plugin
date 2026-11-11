@@ -174,7 +174,7 @@ All notable changes to this project will be documented in this file.
 - **`summarizeConversation`** — same lazy regex fix as extractFacts, plus robust JSON parsing with cleanup fallback
 
 ### Removed
-- User-specific project names (`krolik`, `hully`) from query rewriting patterns
+- User-specific project names from query rewriting patterns
 
 ## [2.0.0] — 2026-02-02
 
