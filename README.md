@@ -8,21 +8,21 @@ MemOS stores and retrieves memories. OpenClaw runs agents. But MemOS doesn't kno
 
 - **When to save** — after every conversation, before compaction, after tool calls
 - **When to retrieve** — before every agent turn, with smart filtering to skip casual messages
-- **What to extract** — typed memories (profile / behavior / skill / event / task), compaction summaries, tool traces
+- **What to extract** — typed memories (profile / behavior / event / task), compaction summaries, tool traces
 
 ## Features
 
 | Feature | Description | Since |
 |---------|-------------|-------|
 | **Operation stats** | In-memory counters and timings; `memos_stats` tool + periodic 30-min log | v3.3 |
-| **LLM reranker** | Filters irrelevant search results via LLM before injection; over-fetches (top_k=12) then keeps only relevant memories | v3.2 |
+| **LLM reranker** | Opt-in (`"reranker": true`): filters irrelevant search results via LLM before injection; over-fetches (top_k=12) then keeps only relevant memories | v3.2 |
 | **Task management** | Create, complete, list tasks via agent tools; append-only reconciliation on MemOS | v3.0 |
-| **Typed memory extraction** | Memories categorized into 5 types (profile, behavior, skill, event, task) | v3.0 |
+| **Typed memory extraction** | Memories categorized into 4 types (profile, behavior, event, task); skills are left to MemOS Skill Memory since v3.5.1 | v3.0 |
 | **Smart context injection** | Pre-retrieval decision, query rewriting, sufficiency filtering | v2.1 |
 | **Compaction flush** | Conversations segmented into topic-coherent chunks, each summarized separately | v2.0 |
 | **Post-compaction recovery** | Enriched context automatically restored after compaction | v2.0 |
-| **Skill learning** | Complex tool operations documented as reusable skills | v2.0 |
 | **Tool traces** | Tool execution results saved for future reference | v1.0 |
+| **TickTick sync** | Optional: with `TICKTICK_ACCESS_TOKEN` set, tasks sync by project (`ticktickSync`) | v3.x |
 | **Content hash dedup** | SHA256-based deduplication prevents duplicate memories | v3.0 |
 | **Bilingual** | Pre-retrieval patterns support English and Russian | v2.1 |
 
@@ -51,18 +51,20 @@ In `~/.openclaw/openclaw.json` under `plugins.entries`:
   "config": {
     "memosApiUrl": "http://127.0.0.1:8000",
     "memosUserId": "default",
+    "memosCubeId": "default",
     "internalServiceSecret": "",
     "contextInjection": true,
     "factExtraction": true,
     "compactionFlush": true,
     "toolTraces": true,
     "taskManager": true,
-    "reranker": true
+    "reranker": true,
+    "ticktickSync": true
   }
 }
 ```
 
-All values are optional — sensible defaults apply. Credentials can also be set via `MEMOS_API_URL`, `MEMOS_USER_ID`, `INTERNAL_SERVICE_SECRET` environment variables or `~/.openclaw/.env`.
+All values are optional. Credentials can also be set via the `MEMOS_API_URL`, `MEMOS_USER_ID`, `MEMOS_CUBE_ID` and `INTERNAL_SERVICE_SECRET` environment variables or `~/.openclaw/.env`. Without any setting the code falls back to `http://127.0.0.1:8000` and the user and cube id `memos` (the manifest shows `default`; the code wins). The hooks and the task manager are on unless set to `false`; the reranker is off unless `"reranker": true`.
 
 ### Compaction settings
 
@@ -84,9 +86,10 @@ hooks/
   context-injection.js           before_agent_start  -> retrieval + rerank + inject
   fact-extraction.js             agent_end           -> extract typed memories
   compaction-flush.js            before/after_compaction -> segment + summarize + persist
-  tool-trace.js                  tool_result_persist -> save traces + learn skills
+  tool-trace.js                  tool_result_persist -> save tool execution traces
 lib/
   client.js                      HTTP transport, auth, retries, config, dedup cache
+  ticktick.js                    Optional TickTick project/task sync (needs TICKTICK_ACCESS_TOKEN)
   utils.js                       Shared utilities (JSON parsing, content access, task IDs)
   health.js                      Cached liveness probe (60s TTL)
   search.js                      Semantic search + context block formatting
@@ -126,7 +129,7 @@ User message
   |    Mark post-compaction state (next turn fetches enriched context)
   |
   +- tool_result_persist
-       Save execution traces, extract skills from complex operations
+       Save execution traces
 ```
 
 ## Memory types
@@ -137,7 +140,6 @@ Inspired by [memU](https://github.com/NevaMind-AI/memU):
 |------|------------------|------|
 | **Profile** | Stable user facts (age, job, location, preferences) | `user_profile`, `stable_fact` |
 | **Behavior** | Recurring patterns, habits, routines | `behavior_pattern`, `habit` |
-| **Skill** | Agent skills with documentation | `agent_skill`, `workflow` |
 | **Event** | Time-bound events and decisions | `event`, `decision` |
 | **Task** | Actionable items from conversation | `task`, `pending` |
 
@@ -174,6 +176,12 @@ journalctl --user -u openclaw-gateway.service -n 20 --no-pager | grep MEMOS
 - [MemOS](https://github.com/MemTensor/MemOS) with `/product/search`, `/product/add`, `/product/chat/complete`
 - Node.js >= 22
 
+## Status
+
+Version 3.5.1 (`package.json`; the plugin manifest still says 3.4.1), no tagged releases; see
+[CHANGELOG.md](CHANGELOG.md). Contributions: [CONTRIBUTING.md](CONTRIBUTING.md). Agent notes:
+[CLAUDE.md](CLAUDE.md); all documents: [docs/INDEX.md](docs/INDEX.md).
+
 ## License
 
-Apache-2.0 — see [LICENSE](./LICENSE)
+FSL-1.1-Apache-2.0 (Functional Source License 1.1, converting to Apache-2.0) — see [LICENSE](./LICENSE).
